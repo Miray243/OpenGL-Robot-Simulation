@@ -1,32 +1,66 @@
-#ifndef SCENE_H
-#define SCENE_H
-
-#include "Robot.h"
-#include "Room.h"
-#include "Light.h"
-#include "ObjModel.h"
 #include "Camera.h"
-#include <vector>
+#include <cmath>
 
-class Scene {
-public:
-    Scene();
-    ~Scene();
-
-    void init();
-    void draw();
-    void update();
-    void handleKeyboard(unsigned char key, int x, int y);
-    void handleSpecialKeys(int key, int x, int y);
-
-private:
-    Robot* robot;
-    Room* room;
-    Light* mainLight;
-    Camera* camera;
-    
-    // Modeller için vector (list) kullanıyoruz
-    std::vector<ObjModel*> models;
-};
-
+#ifndef M_PI
+#define M_PI 3.1415926535
 #endif
+
+Camera::Camera() {
+    mode = FOLLOW;
+    posX = 0.0f; posY = 5.0f; posZ = 10.0f;
+    yaw = -90.0f; pitch = -20.0f;
+    distanceToRobot = 8.0f;
+}
+
+void Camera::toggleMode() {
+    mode = (mode == FREE) ? FOLLOW : FREE;
+}
+
+void Camera::update(Robot* robot) {
+    if (mode == FOLLOW && robot != nullptr) {
+        // Robotun arkasında ve biraz yukarısında dur
+        float angleRad = (robot->orientationY + 90.0f) * M_PI / 180.0f; // Arkasından bakması için +90
+        
+        float targetX = robot->x - distanceToRobot * cos(angleRad);
+        float targetZ = robot->z - distanceToRobot * sin(angleRad);
+        
+        // Yumuşak geçiş (basit lineer interpolasyon)
+        posX += (targetX - posX) * 0.1f;
+        posZ += (targetZ - posZ) * 0.1f;
+        posY = 4.0f; // Yükseklik sabit
+
+        // Robotun olduğu yere bak
+        yaw = -robot->orientationY - 90.0f; 
+        pitch = -15.0f;
+    }
+}
+
+void Camera::apply() {
+    glRotatef(-pitch, 1.0f, 0.0f, 0.0f);
+    glRotatef(-yaw, 0.0f, 1.0f, 0.0f);
+    glTranslatef(-posX, -posY, -posZ);
+}
+
+void Camera::moveForward(float amount) {
+    if (mode == FREE) {
+        float rad = yaw * M_PI / 180.0f;
+        posX += cos(rad) * amount; // Sin/Cos yerleşimi OpenGL koordinatlarına göre
+        posZ += sin(rad) * amount;
+    }
+}
+
+void Camera::moveRight(float amount) {
+    if (mode == FREE) {
+        float rad = (yaw + 90.0f) * M_PI / 180.0f;
+        posX += cos(rad) * amount;
+        posZ += sin(rad) * amount;
+    }
+}
+
+void Camera::rotateYaw(float angle) {
+    if (mode == FREE) yaw += angle;
+}
+
+void Camera::rotatePitch(float angle) {
+    if (mode == FREE) pitch += angle;
+}
